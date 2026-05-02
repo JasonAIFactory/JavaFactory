@@ -16,6 +16,7 @@ CMiC Software Engineer (Java/J2EE + Oracle SQL/PLSQL) 면접 준비 자료.
 | `06-sql-basics.md` | SQL 기본 10주제 (Oracle 문법) |
 | `07-plsql.md` | PL/SQL — 블록, cursor, exception, procedure, function, trigger |
 | `08-sql-tuning.md` | 인덱스, 실행계획, 튜닝, transaction, 운영지원 답변 |
+| `practice/` | 백지 코딩 연습 5문제 (VS Code에서 바로 실행) + 정답 |
 
 ---
 
