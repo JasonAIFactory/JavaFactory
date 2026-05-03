@@ -173,6 +173,69 @@ CREATE TABLE project_cost (
 
 ---
 
+## 11. Highest Salary Query (단골 라이브 코딩)
+
+🧠 가장 높은 급여를 가진 직원 조회 — Oracle/MySQL/SQL Server 문법 다름.
+
+### ❌ 흔한 실수 (DESC 빠지고 행 제한 없음)
+
+```sql
+-- 모든 행이 정렬되어 다 나옴. "highest"가 아님!
+SELECT * FROM employee ORDER BY salary;
+```
+
+### ✅ Oracle 12c+ (가장 깔끔)
+
+```sql
+SELECT * FROM employee
+ORDER BY salary DESC
+FETCH FIRST 1 ROW ONLY;
+```
+
+### ✅ Oracle ROWNUM (구버전 호환)
+
+```sql
+SELECT * FROM (
+    SELECT * FROM employee
+    ORDER BY salary DESC
+)
+WHERE ROWNUM = 1;
+```
+
+### ✅ Window function (동일 급여 여러 명도 처리)
+
+```sql
+SELECT *
+FROM (
+    SELECT e.*,
+           DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk
+    FROM employee e
+)
+WHERE rnk = 1;     -- 동률 1등 모두 반환
+```
+
+### ✅ Subquery (가장 단순한 사고)
+
+```sql
+SELECT *
+FROM employee
+WHERE salary = (SELECT MAX(salary) FROM employee);
+```
+
+🗣️ "I avoid simple ORDER BY without DESC and without row limit — that returns everything. In Oracle 12c, FETCH FIRST 1 ROW ONLY is the cleanest. For older Oracle I wrap with ROWNUM. If multiple employees share the max salary, I use DENSE_RANK over salary descending and filter rank equals one. The simplest query is a subquery with MAX — easy to read."
+
+⚠️ **면접 팁:** 면접관이 "여러 명이 같은 급여면?" 물어봄. 무조건 **window function** 또는 **subquery with MAX** 답변.
+
+---
+
+## 12. Procedure vs Function 한 줄
+
+🧠 자세한 건 [07-plsql.md](07-plsql.md) 참조.
+
+🗣️ "Procedure does not return a value. Function returns a value with RETURN. Function can be used inside a SELECT. Procedure cannot. I use functions for calculations like totals, procedures for actions like updates."
+
+---
+
 ## 🎯 SQL 한 줄 카드
 
 | 주제 | 한 줄 |

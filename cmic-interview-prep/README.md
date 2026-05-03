@@ -16,7 +16,10 @@ CMiC Software Engineer (Java/J2EE + Oracle SQL/PLSQL) 면접 준비 자료.
 | `06-sql-basics.md` | SQL 기본 10주제 (Oracle 문법) |
 | `07-plsql.md` | PL/SQL — 블록, cursor, exception, procedure, function, trigger |
 | `08-sql-tuning.md` | 인덱스, 실행계획, 튜닝, transaction, 운영지원 답변 |
-| `practice/` | 백지 코딩 연습 5문제 (VS Code에서 바로 실행) + 정답 |
+| `09-java-classic-questions.md` | Java 8, Stream, StringBuffer, Override/Overload, LinkedList, ConcurrentHashMap, Tree, Singleton |
+| `10-rest-api.md` | REST 기본 + HTTP 메서드 + Meeting/Participants API 설계 |
+| `11-concurrency.md` | concurrency vs parallelism, deadlock, race condition, crash 분석 |
+| `practice/` | 백지 코딩 연습 (Basic 10 + Problem 5 + OOP 5) + 정답 |
 
 ---
 
