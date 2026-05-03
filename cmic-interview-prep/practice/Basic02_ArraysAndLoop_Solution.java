@@ -1,0 +1,15 @@
+public class Basic02_ArraysAndLoop_Solution {
+    public static void main(String[] args) {
+        int[] arr = {1, 2, 3, 4, 5};
+        int sum = 0;
+        for (int i = 0; i < arr.length; i++) {
+            sum += arr[i];
+        }
+        System.out.println(sum);   // 15
+
+        // for-each (alternative)
+        int sum2 = 0;
+        for (int n : arr) sum2 += n;
+        System.out.println(sum2);  // 15
+    }
+}

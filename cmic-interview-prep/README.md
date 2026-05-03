@@ -5,6 +5,12 @@ CMiC Software Engineer (Java/J2EE + Oracle SQL/PLSQL) 면접 준비 자료.
 
 ---
 
+## 🗺️ 시작은 여기서
+
+👉 **[ROADMAP.md](ROADMAP.md)** — 8시간 (Day 1 + Day 2) 분 단위 학습 계획. 면접 당일 아침 cheatsheet 포함.
+
+---
+
 ## 📁 파일 구조
 
 | 파일 | 내용 |

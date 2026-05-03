@@ -73,3 +73,19 @@ java -version
 5. 영어로 풀이 한 번 말해보기 (학습 자료의 🗣️ 참고)
 
 ⚠️ 정답 보기 전에 **20분 안에 풀리지 않으면 학습 자료 (`02-java-basics.md`) 보고 힌트만 얻기**. 그래도 안 되면 정답 보기.
+
+---
+
+## 📂 정답 파일 (각 문제마다 매칭)
+
+각 문제에 대해 정답이 별도 Java 파일로 있음 (실행해서 비교 가능):
+
+- `Basic01_PrintAndVariables.java` ↔ `Basic01_PrintAndVariables_Solution.java`
+- `Basic02_ArraysAndLoop.java` ↔ `Basic02_ArraysAndLoop_Solution.java`
+- ... (Basic01~10 모두)
+- `Problem01_PrefixCount.java` ↔ `Problem01_PrefixCount_Solution.java`
+- ... (Problem01~05 모두)
+- `OOP01_Override.java` ↔ `OOP01_Override_Solution.java`
+- ... (OOP01~05 모두)
+
+추가로 `BASIC_SOLUTIONS.md` / `SOLUTIONS.md` / `OOP_SOLUTIONS.md`에 영어 설명 스크립트 포함.
