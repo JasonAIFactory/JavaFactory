@@ -1,6 +1,6 @@
 # Java 코딩 연습 (백지부터)
 
-면접 실전처럼 **빈 메서드만 있고 본인이 채워야** 합니다. 각 파일에 main()이 있어 바로 실행해서 테스트 가능.
+빈 메서드만 있고 본인이 채우는 형식. 각 파일에 `main()`이 있어 VS Code에서 바로 F5 실행 가능.
 
 ---
 
@@ -10,19 +10,14 @@
 
 ```bash
 brew install openjdk@17
-
-# 환경변수 설정 (zsh)
 echo 'export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
-
-# 확인
 java -version
 ```
 
 ### 2. VS Code 익스텐션
 
 마켓플레이스에서 **"Extension Pack for Java"** (Microsoft) 검색 → 설치.
-이거 하나로 6개 익스텐션 자동 설치 (Language Support, Debugger, Test Runner, Maven, Gradle, Project Manager).
 
 ### 3. 실행
 
@@ -32,7 +27,30 @@ java -version
 
 ---
 
-## 📝 연습 파일 5개
+## 📚 추천 진행 순서
+
+### 1단계: Basic 10개 (기초 다지기)
+
+각 파일은 5~15분이면 끝남. **언어 자체에 익숙해지는 게 목적**.
+
+| 파일 | 주제 |
+| --- | --- |
+| `Basic01_PrintAndVariables.java` | 변수 선언 + println |
+| `Basic02_ArraysAndLoop.java` | 배열 + for 루프 |
+| `Basic03_IfElse.java` | if / else if / else |
+| `Basic04_Method.java` | 메서드 정의 + 호출 |
+| `Basic05_Strings.java` | 문자열 메서드 |
+| `Basic06_ArrayList.java` | List add/get/iterate |
+| `Basic07_HashMap.java` | Map put/get/contains |
+| `Basic08_SimpleClass.java` | 클래스 + 생성자 + toString |
+| `Basic09_Inheritance.java` | 상속 + 다형성 |
+| `Basic10_TryCatch.java` | 예외 처리 |
+
+→ 정답은 `BASIC_SOLUTIONS.md`
+
+### 2단계: Problem 5개 (실전 패턴)
+
+기초가 익숙해지면 도전. CMiC가 cost management ERP라서 이런 패턴이 매일 나옴.
 
 | 파일 | 난이도 | 주제 |
 | --- | --- | --- |
@@ -42,6 +60,8 @@ java -version
 | `Problem04_FindDuplicates.java` | 🟡 중간 | Set 활용 |
 | `Problem05_SimpleCache.java` | 🟡 중간 | LinkedHashMap LRU |
 
+→ 정답은 `SOLUTIONS.md`
+
 ---
 
 ## 🎯 사용법
@@ -49,14 +69,7 @@ java -version
 1. 파일 열기
 2. **TODO** 주석 부분 본인이 채우기
 3. F5로 실행
-4. 모든 테스트가 `✓ PASS`면 성공
-5. 영어로 풀이 설명 한 번 말해보기 (학습 자료의 🗣️ 스크립트 참고)
+4. 출력이 expected와 일치하면 성공
+5. 영어로 풀이 한 번 말해보기 (학습 자료의 🗣️ 참고)
 
----
-
-## 📚 추천 진행 순서
-
-1. **빈 파일에서 시작** — 정답 보지 말고 직접 풀기
-2. **20분 안에 안 풀리면** — 학습 자료 (`03-coding-practice.md`) 보고 힌트만 얻기
-3. **풀이 후** — 영어로 설명 1번 말해보기
-4. **다음 날 다시** — 같은 문제 다시 풀어보기 (반복이 중요)
+⚠️ 정답 보기 전에 **20분 안에 풀리지 않으면 학습 자료 (`02-java-basics.md`) 보고 힌트만 얻기**. 그래도 안 되면 정답 보기.
