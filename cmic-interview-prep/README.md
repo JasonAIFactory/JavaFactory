@@ -26,6 +26,7 @@ CMiC Software Engineer (Java/J2EE + Oracle SQL/PLSQL) 면접 준비 자료.
 | `10-rest-api.md` | REST 기본 + HTTP 메서드 + Meeting/Participants API 설계 |
 | `11-concurrency.md` | concurrency vs parallelism, deadlock, race condition, crash 분석 |
 | `practice/` | 백지 코딩 연습 (Basic 10 + Problem 5 + OOP 5) + 정답 |
+| `2hour-drill/` | ⭐ 면접 직전 2시간 압축 드릴 (코딩 15 + 한 줄 영어 30개 × 10번) |
 
 ---
 
