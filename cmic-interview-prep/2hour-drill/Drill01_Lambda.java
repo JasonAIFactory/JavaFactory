@@ -25,6 +25,8 @@ import java.util.stream.*;
 public class Drill01_Lambda {
     public static void main(String[] args) {
         // TODO 1: Runnable as lambda — print "running"
+        Runnable r = null;
+        r.run();
 
 
         // TODO 2: Given list, filter even numbers, collect, print
@@ -33,3 +35,4 @@ public class Drill01_Lambda {
         // expected output: [2, 4, 6]
     }
 }
+

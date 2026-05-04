@@ -24,6 +24,14 @@ public class Drill02_StringBuilder {
         int[] arr = {1, 2, 3, 4, 5};
 
         // TODO: build "1,2,3,4,5" with StringBuilder
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < arr.length; i++) {
+            sb.append(arr[i]);
+            if (i < arr.length - 1) {
+                sb.append(",");
+            }
+        }
+
 
 
         // expected output: 1,2,3,4,5
