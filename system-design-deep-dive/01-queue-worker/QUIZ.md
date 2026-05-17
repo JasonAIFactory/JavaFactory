@@ -1,69 +1,114 @@
-# 01 — Queue & Worker 퀴즈
+# 01 - Queue & Worker 퀴즈 (한글 ↔ English)
+
+> 각 문제 한글로 생각하고, 영어 문장으로도 답해보기 (실무에선 영어로 말함).
+> Think in Korean, then answer in English too (you'll speak English at work).
 
 ---
 
-## A. 진단 퀴즈 (이론 보기 **전에** 푼다 — 8문제, 10분)
+## A. 진단 퀴즈 / Diagnostic (이론 보기 전 / before theory — 8문제)
 
-> 종이/메모장에 답을 쓰고 채점하세요. 6개 미만이면 THEORY를 더 천천히 읽으세요.
+1. KR: 가입 시 이메일 2초. 사용자가 안 기다리게 하려면? 구조 이름은?
+   EN: Signup email takes 2s. How to not make the user wait? Name the pattern.
+2. KR: 주문 100배 폭주. 큐 있을 때/없을 때 차이?
+   EN: Orders spike 100x. Difference with vs without a queue?
+3. KR: "at-least-once"란? 부작용은?
+   EN: What is "at-least-once"? Its side effect?
+4. KR: exactly-once를 실무에서 어떻게 "사실상" 달성?
+   EN: How do you "effectively" achieve exactly-once in practice?
+5. KR: 워커가 처리 중 죽음. 메시지는? 관련 파라미터 이름?
+   EN: A worker dies mid-processing. What of the message? Name the parameter.
+6. KR: 실패를 즉시 재시도하면 왜 위험? 완화책 2개?
+   EN: Why is immediate retry dangerous? Two mitigations?
+7. KR: 같은 메시지 5번 실패. 큐 전체를 안 막으려면?
+   EN: Same message fails 5 times. How to not block the whole queue?
+8. KR: 프로듀서가 워커보다 빠르면? 어떻게 막나?
+   EN: Producer faster than workers? How to stop it?
 
-1. 회원가입 시 이메일 발송에 2초 걸린다. 사용자가 2초를 안 기다리게 하려면 구조를 어떻게 바꾸나? 그 구조의 이름은?
-2. 블랙프라이데이에 주문이 평소 100배가 됐다. 큐가 있을 때와 없을 때 시스템에 무슨 일이 생기나?
-3. "at-least-once 전달"이란 무엇이고, 그 부작용은 무엇인가?
-4. exactly-once 전달은 실무에서 어떻게 "사실상" 달성하나?
-5. 워커가 메시지를 가져간 뒤 처리 중에 죽었다. 그 메시지는 어떻게 되어야 하나? 관련된 큐 파라미터 이름은?
-6. 실패한 작업을 즉시 재시도하면 왜 위험한가? 어떻게 완화하나? (용어 2개 이상)
-7. 같은 메시지가 5번 연속 실패한다. 큐 전체를 막지 않으려면?
-8. 프로듀서가 워커보다 훨씬 빠르면 큐에 무슨 일이? 어떻게 막나?
+<details><summary>👉 정답 / Answers</summary>
 
-<details>
-<summary>👉 진단 퀴즈 정답</summary>
-
-1. 이메일 발송을 **큐에 작업으로 넣고** 워커가 백그라운드 처리. 사용자 응답은 즉시. → **비동기 처리 / producer-consumer 패턴.**
-2. **없으면**: DB 커넥션·CPU 한계 초과로 전체 장애. **있으면**: 큐가 버퍼가 되어 워커가 자기 처리율대로 소비, 큐만 길어지고 시스템은 생존 → **부하 평탄화(load leveling).**
-3. 메시지를 **최소 1번** 전달 보장(처리 성공 후 삭제). ack 유실 시 **중복 처리** 가능.
-4. 전송은 at-least-once로 두고 **컨슈머를 멱등(idempotent)** 하게 — 메시지 고유 ID로 중복 감지(dedup 테이블/Redis SET/upsert/DB unique).
-5. **visibility timeout** 만료 후 메시지가 다시 보여 다른 워커가 재처리. (너무 짧으면 정상 처리 중 중복, 너무 길면 복구 지연.)
-6. 죽은 다운스트림을 **retry storm**으로 더 죽임. → **지수 백오프(exponential backoff)** + **지터(jitter)** + 서킷브레이커 + 최대 재시도 횟수.
-7. **데드레터 큐(DLQ)** 로 격리. poison pill이 큐를 막지 않게.
-8. 큐가 무한히 커져 메모리/디스크 폭발. → **바운디드 큐 + 백프레셔**(블로킹 / reject 429 / drop).
+1. KR: 이메일을 큐에 작업으로 넣고 워커가 백그라운드 처리. EN: enqueue
+   the email; a worker processes it in the background. → 비동기 처리 /
+   asynchronous processing (producer–consumer).
+2. KR: 없으면 DB·CPU 초과로 전체 장애. 있으면 큐가 버퍼라 시스템 생존.
+   EN: without → DB/CPU overload, full outage. with → the queue buffers,
+   system survives (load leveling).
+3. KR: 최소 1번 전달(성공 후 삭제), ack 유실 시 중복. EN: delivered at
+   least once (delete after success); duplicates if the ack is lost.
+4. KR: at-least-once + 멱등 컨슈머(고유 ID dedup/upsert). EN:
+   at-least-once + an idempotent consumer (dedup by unique id / upsert).
+5. KR: 가시성 타임아웃 만료 후 재노출 → 다른 워커가 처리. EN: after the
+   **visibility timeout** it reappears for another worker.
+6. KR: retry storm. → 지수 백오프 + 지터(+서킷브레이커, 최대 횟수). EN:
+   retry storm → exponential backoff + jitter (+ circuit breaker, max
+   attempts).
+7. KR: DLQ로 격리. EN: isolate it in a **dead letter queue (DLQ)**.
+8. KR: 큐 무한 증가 → 바운디드 큐 + 백프레셔(블록/429/drop). EN: queue
+   grows forever → bounded queue + backpressure (block / 429 / drop).
 
 </details>
 
 ---
 
-## B. 확인 퀴즈 (모듈 끝나고 — 10문제, 코드 분석 + 직접 구현 후)
+## B. 확인 퀴즈 / Exit quiz (코드·구현 후 / after code & build — 10문제)
 
-1. 큐의 본질을 한 문장으로: 큐는 무엇과 무엇을 "분리"하는 장치인가?
-2. `at-most-once` vs `at-least-once`의 코드상 차이는 한 줄이다. 그 한 줄은? (ack/삭제를 처리 *전*에 하나 *후*에 하나)
-3. 멱등 컨슈머를 Java로 구현하는 가장 단순한 방법 2가지를 코드 수준으로 설명하라.
-4. visibility timeout을 30초로 뒀는데 실제 처리에 평균 45초 걸린다. 무슨 일이 생기나? 어떻게 고치나?
-5. 백오프에 지터를 안 넣으면 정확히 무슨 현상이 생기나? (단어: thundering herd)
-6. competing consumers로 워커를 5배 늘렸더니 처리량이 안 늘고 DB 에러가 폭증했다. 원인과 해법은?
-7. 결제 시스템에서 "같은 결제가 두 번 일어나지 않게" 큐 레벨에서 무엇을 보장하고, 애플리케이션 레벨에서 무엇을 보장하나?
-8. 순서가 꼭 필요한 작업(같은 계좌 입출금)을 큐로 처리하면서 병렬성도 어느 정도 얻으려면?
-9. SQS 대신 Kafka를 골라야 하는 상황 2가지를 대라.
-10. 무한(unbounded) 큐가 "장애를 뒤로 미루는 폭탄"인 이유를 설명하라.
+1. KR: 큐는 무엇과 무엇을 분리? EN: A queue separates what and what?
+2. KR: at-most vs at-least의 코드 한 줄 차이? EN: The one-line code
+   difference between at-most and at-least?
+3. KR: 멱등 컨슈머 구현 2가지? EN: Two ways to implement an idempotent
+   consumer?
+4. KR: 가시성 30s인데 처리 45s면? 해결? EN: Visibility 30s but
+   processing takes 45s — what happens, how to fix?
+5. KR: 지터 없으면 무슨 현상? EN: No jitter — what phenomenon? (term)
+6. KR: 워커 5배인데 DB 에러 폭증. 원인·해법? EN: 5x workers but DB
+   errors explode — cause and fix?
+7. KR: 결제 중복 방지: 큐 레벨/앱 레벨 각각? EN: Prevent double payment:
+   what at queue level vs app level?
+8. KR: 순서 필요 작업 + 병렬성 둘 다? EN: Need ordering AND some
+   parallelism — how?
+9. KR: SQS 대신 Kafka 골라야 하는 상황 2개? EN: Two cases to pick Kafka
+   over SQS?
+10. KR: 무한 큐가 "폭탄"인 이유? EN: Why is an unbounded queue a "bomb"?
 
-<details>
-<summary>👉 확인 퀴즈 정답</summary>
+<details><summary>👉 정답 / Answers</summary>
 
-1. **"시간"과 "고장"을 분리**한다. 빠른 응답(시간 분리: 요청과 처리를 다른 시점에) + 장애 격리(고장 분리: 한쪽이 죽어도 메시지 보존).
-2. ack/삭제를 **처리 전에** 하면 at-most-once(처리 중 죽으면 유실), **처리 성공 후에** 하면 at-least-once(ack 유실 시 중복). 위치 한 줄 차이.
-3. (a) 처리 전 `Set<String> processedIds`(분산이면 Redis SETNX / DB unique 제약)에 메시지 ID를 넣어보고 이미 있으면 skip. (b) 결과를 **upsert**로 써서 두 번 써도 같은 상태가 되게.
-4. 45초 > 30초이므로 워커가 아직 처리 중인데 메시지가 다시 보여 **다른 워커가 중복 실행** → 같은 작업 2번. 고치기: visibility timeout을 처리 시간 + 여유(p99 기준)로 늘리거나, 워커가 처리 중 주기적으로 timeout 연장(heartbeat/visibility extension).
-5. 모든 워커가 **동시에** 같은 시각에 재시도해 다운스트림에 동기화된 부하 스파이크 = **thundering herd / retry storm**. 지터(랜덤 분산)로 재시도 시점을 흩뿌려 완화.
-6. 워커는 stateless라 늘었지만 **공유 자원인 DB 커넥션 풀이 병목/고갈**. 해법: 워커 동시성 상한, DB 커넥션 풀 사이징, 배치 insert/update, 필요시 DB 자체 스케일링(모듈 06/07).
-7. 큐 레벨: 사실상 exactly-once는 불가하므로 **at-least-once**만 보장. 애플리케이션 레벨: **멱등 키(idempotency key)** 로 같은 결제 ID 중복 처리를 무효화 (Stripe 방식).
-8. **키 기반 파티셔닝**: `account_id` 해시로 파티션 결정 → 같은 계좌는 항상 같은 파티션(그 안에서 순서 보장), 서로 다른 계좌는 다른 파티션에서 병렬. 전역 순서는 포기, "필요한 범위"만 순서.
-9. (a) 높은 처리량 + 메시지 **재처리/재생(offset 되감기)** 이 필요할 때, (b) 한 이벤트를 **여러 독립 소비자 그룹**이 각자 다른 속도로 소비 + 파티션 단위 순서가 필요할 때. (그 외: 장기 보존 로그, 스트림 처리.)
-10. 프로듀서 > 컨슈머 상태가 지속되면 큐가 끝없이 커진다. 당장은 안 죽지만 메모리/디스크가 한계에 도달하는 **더 큰 장애로 지연·증폭**될 뿐. 바운디드 큐는 문제를 **지금, 가장자리에서**(429로 거절) 드러내 전체 붕괴를 막는다.
+1. KR: 시간과 고장. EN: **time and failure** (fast response + failure
+   isolation).
+2. KR: ack/삭제를 처리 전(at-most) vs 성공 후(at-least). EN: ack/delete
+   **before** processing (at-most) vs **after** success (at-least).
+3. KR: (a) 처리 전 처리완료 ID 확인(Redis SETNX/DB unique) (b) 결과를
+   upsert. EN: (a) check a processed-id set before work (Redis
+   SETNX/DB unique) (b) write the result with an upsert.
+4. KR: 45>30이라 처리 중 재노출 → 중복 실행. 해결: 타임아웃을 p99+여유로
+   늘리거나 처리 중 연장(heartbeat). EN: 45>30 so it reappears while
+   still running → double execution. Fix: raise timeout to p99+margin,
+   or extend it mid-processing (heartbeat).
+5. KR: 모든 워커가 동시 재시도 = thundering herd. EN: all workers retry
+   at once = **thundering herd / retry storm**.
+6. KR: 워커는 무상태라 늘었지만 공유 DB 커넥션 고갈. → 동시성 상한, 풀
+   사이징, 배치. EN: workers scaled but the shared DB connection pool is
+   the bottleneck. → cap concurrency, size the pool, batch.
+7. KR: 큐=at-least-once만, 앱=멱등 키로 중복 무효화(Stripe). EN: queue =
+   only at-least-once; app = an **idempotency key** voids duplicates.
+8. KR: 키 기반 파티셔닝(같은 키=같은 파티션 순서, 다른 키 병렬). EN:
+   **key-based partitioning** (same key → same partition → order;
+   different keys run in parallel).
+9. KR: (a) 높은 처리량 + 재처리(offset 되감기) (b) 여러 독립 소비자
+   그룹 + 파티션 순서. EN: (a) high throughput + replay (rewind offset)
+   (b) many independent consumer groups + per-partition order.
+10. KR: 프로듀서>컨슈머가 지속되면 큐가 끝없이 커져 더 큰 장애로 지연.
+    바운디드는 지금 가장자리에서(429) 드러냄. EN: if producer>consumer
+    persists, the queue grows until a bigger outage — just delayed.
+    Bounded surfaces it now, at the edge (429).
 
 </details>
 
 ---
 
-## C. 자기 채점 기준
+## C. 자기 채점 / Self-grading
 
-- 진단 6+/8: 이론을 빠르게 훑어도 됨. 미만이면 정독.
-- 확인 8+/10: 모듈 통과. 4·6·8번을 못 맞췄으면 `reference/R2`, `R3` 코드를 다시.
-- 파인만 테스트: 9·10번을 **남에게 말로** 설명 가능해야 진짜 통과.
+- KR: 진단 6+/8이면 이론 빠르게, 미만이면 정독. EN: 6+/8 on diagnostic
+  → skim theory; below → read closely.
+- KR: 확인 8+/10이면 통과. 4·6·8 틀리면 `reference/R2,R3` 다시. EN:
+  8+/10 on exit → pass. Missed 4/6/8 → revisit `reference/R2,R3`.
+- KR: 9·10을 **남에게 영어로 말로** 설명되면 진짜 통과. EN: if you can
+  explain 9 & 10 **out loud in English**, you truly passed.

@@ -1,180 +1,218 @@
-# 01 — Queue & Worker 딥다이브
+# 01 - Queue & Worker 딥다이브 (한글 ↔ English 병기)
 
-> 학습 전: 먼저 `QUIZ.md`의 **진단 퀴즈 8문제**를 풀고 채점하세요. 모르는 걸 자각해야 이론이 박힙니다.
+> 읽는 법: **한글로 개념을 잡고, 바로 아래 영어로 같은 말을 다시 본다.**
+> 영어는 면접/실무에서 쓰는 표현 그대로. 모국어를 영어로 "바꿔" 가는 연습.
+> Read the Korean to get the idea, then read the English right below for
+> the same idea in interview/work words.
+
+> 학습 전: `QUIZ.md`의 **진단 퀴즈 8문제**부터.
+> Before studying: do the 8 diagnostic questions in `QUIZ.md` first.
 
 ---
 
-## 1. 파인만식 직관: 큐는 "주문 전표 꽂이"다
+## 1. 큐는 "주문 전표 꽂이"다 / A queue is an "order ticket rail"
 
-식당을 생각하자.
+**KR.** 식당을 생각하자. 손님이 "김치찌개 하나요"라고 주문(요청)한다.
+요리사가 직접 주문을 받으면, 손님이 몰릴 때 요리를 못 하고 줄이 밖까지
+늘어선다(동기, 블로킹). 그래서 캐셔가 주문을 **전표에 적어 꽂이에
+꽂기만** 하고 "번호 부르면 오세요"라고 한다(비동기). 요리사들(워커)이
+꽂이에서 전표를 한 장씩 떼어 요리한다. 요리사가 3명이면 3개를 동시에.
 
-- 손님이 "김치찌개 하나요" 라고 **주문(요청)** 한다.
-- 만약 **요리사가 직접 주문을 받는다면**? 손님이 몰리면 요리사는 주문 받느라 요리를 못 한다. 줄이 밖까지 늘어선다. 손님은 음식이 다 나올 때까지 카운터 앞에 서 있어야 한다 (**동기, 블로킹**).
-- 그래서 식당은 **전표 꽂이(주문 큐)** 를 둔다. 캐셔는 주문을 전표에 적어 꽂이에 **꽂기만** 하고 "번호 부르면 오세요" 한다 (**비동기, 논블로킹**).
-- 주방의 **요리사들(워커)** 은 꽂이에서 전표를 **한 장씩 떼어** 요리한다. 요리사가 3명이면 3개를 동시에 만든다.
+**EN.** Think of a restaurant. A customer orders ("one kimchi stew").
+If the cook takes orders directly, a rush blocks the kitchen and the
+line grows outside (synchronous, blocking). So the cashier just **writes
+the order on a ticket and puts it on a rail**, and says "we'll call your
+number" (asynchronous). The cooks (workers) take tickets one by one and
+cook. Three cooks cook three orders at once.
 
-여기서 시스템 디자인 용어가 전부 나온다:
-
-| 식당 | 시스템 |
+| 식당 / Restaurant | 시스템 / System |
 | --- | --- |
-| 손님 주문 | **메시지 / 작업(task, job)** |
-| 캐셔 | **프로듀서(producer)** — 큐에 넣는 쪽 |
-| 전표 꽂이 | **큐(queue)** — 버퍼 |
-| 요리사 | **워커(worker / consumer)** — 꺼내서 처리하는 쪽 |
-| 요리사 3명 | **워커 풀(worker pool)** — 병렬 처리 |
-| 전표가 쌓임 | **백로그(backlog) / 큐 깊이(queue depth)** |
-| 요리 망쳐서 다시 함 | **재시도(retry)** |
-| 도저히 못 만드는 주문 | **데드레터 큐(DLQ)** 로 빼냄 |
+| 손님 주문 / customer order | 메시지·작업 / message, task (job) |
+| 캐셔 / cashier | 프로듀서 / producer (puts work in) |
+| 전표 꽂이 / ticket rail | 큐 / queue (buffer) |
+| 요리사 / cook | 워커 / worker (consumer) |
+| 요리사 여러 명 / many cooks | 워커 풀 / worker pool (parallel) |
+| 전표가 쌓임 / tickets pile up | 백로그 / backlog (queue depth) |
+| 다시 요리 / re-cook | 재시도 / retry |
+| 못 만드는 주문 / impossible order | 데드레터 큐 / dead letter queue (DLQ) |
 
-**파인만 테스트**: 위 표를 덮고, 친구에게 "큐와 워커가 뭔지" 식당 비유로 90초 안에 설명할 수 있는가? 안 되면 다시 읽는다.
-
----
-
-## 2. 왜 쓰는가 — 안 쓰면 무엇이 터지는가
-
-큐가 없으면(= 요청을 받은 스레드가 그 자리에서 끝까지 처리하면) 다음이 터진다.
-
-### 문제 1. 응답이 느리다 (사용자 체감)
-회원가입 → 이메일 발송(2초) + 썸네일 생성(3초)을 동기로 하면 사용자는 **5초** 기다린다.
-큐에 "이메일 보내라", "썸네일 만들어라"만 넣으면 사용자 응답은 **50ms**. 나머지는 워커가 백그라운드에서.
-→ **이게 큐의 1번 용도: 비동기로 응답 시간 분리.**
-
-### 문제 2. 트래픽 스파이크에 서버가 죽는다 (부하 평탄화 / load leveling)
-블랙프라이데이에 주문이 평소 100배. 동기 처리면 DB 커넥션·CPU가 한계 넘어 **전체 장애**.
-큐가 있으면 큐가 **충격 흡수 버퍼** 역할. 워커는 자기 처리 속도(예: 초당 500건)대로 **천천히 빼서** 처리.
-큐가 좀 길어질 뿐, 시스템은 안 죽는다. → **버퍼링 / 백프레셔.**
-
-### 문제 3. 한 부품 고장이 전체로 번진다 (강결합)
-주문 API가 결제·재고·알림 서비스를 직접 동기 호출. 알림 서비스가 죽으면 **주문도 실패**.
-큐로 분리하면 알림 서비스가 죽어도 메시지는 큐에 쌓여 있다가, 복구되면 처리됨.
-→ **디커플링(decoupling) + 장애 격리.**
-
-### 문제 4. 실패한 작업이 그냥 사라진다
-동기 호출에서 네트워크 에러 나면 그 작업은 증발. 큐는 **메시지를 보관**하고 ack 받기 전엔 안 지움 → **재시도·내구성(durability).**
-
-> 한 줄 요약: **큐는 "시간"과 "고장"을 분리하는 장치다.** 빠른 응답(시간 분리), 죽지 않음(고장 분리).
+> **파인만 테스트 / Feynman test:** 표를 덮고 친구에게 식당 비유로 90초
+> 설명할 수 있는가? / Cover the table and explain it with the restaurant
+> story in 90 seconds.
 
 ---
 
-## 3. 핵심 개념 7개 (이걸 모르면 면접·실무에서 깨진다)
+## 2. 왜 쓰는가 — 안 쓰면 뭐가 터지나 / Why use it — what breaks without it
 
-### (1) 전달 보장 — at-most / at-least / exactly-once
-네트워크는 거짓말한다. "처리 완료" 신호(ack)가 유실될 수 있다.
+**KR.** 큐가 없으면(요청 받은 스레드가 그 자리에서 끝까지 처리하면)
+네 가지가 터진다.
+**EN.** Without a queue (the request thread does all the work inline),
+four things break.
 
-- **at-most-once**: 받자마자 큐에서 삭제 후 처리. 처리 중 죽으면 **유실**. (로그·메트릭 등 잃어도 되는 것)
-- **at-least-once**: 처리 **성공 후** ack/삭제. ack 유실 시 **중복 처리** 가능. ← **현실의 99% 기본값**
-- **exactly-once**: 환상에 가깝다. 실제로는 **at-least-once + 멱등성(idempotency)** 으로 "효과적으로 한 번"을 만든다.
+**1) 느린 응답 / Slow response**
+- KR: 회원가입에 이메일 2초 + 썸네일 3초를 동기로 하면 사용자는 5초를
+  기다린다. 큐에 "보내라"만 넣으면 응답은 50ms.
+- EN: If signup does email (2s) + thumbnail (3s) synchronously, the user
+  waits 5s. Enqueue "do it later" and the response is 50ms.
 
-> 면접 함정: "exactly-once 어떻게 보장?" → "전송 자체로는 사실상 불가. **at-least-once로 받고, 컨슈머를 멱등하게** 만들어 중복이 와도 결과가 같게 한다 (예: `processed_id` 테이블, upsert, dedup 키)."
+**2) 스파이크에 서버가 죽음 / A spike kills the server**
+- KR: 트래픽 100배면 동기 처리는 DB·CPU 한계 초과로 전체 장애. 큐가
+  충격을 흡수하고 워커는 자기 속도대로 천천히 뺀다.
+- EN: At 100x traffic, sync processing exceeds DB/CPU limits and the
+  whole system fails. The queue absorbs the shock; workers drain at
+  their own safe rate. (load leveling)
 
-### (2) Visibility timeout (가시성 타임아웃)
-워커 A가 메시지를 꺼내면 큐는 그 메시지를 **잠깐 숨긴다**(다른 워커가 못 가져가게). 워커 A가 그 시간 안에 ack 안 하면(죽었거나 느림) 메시지가 **다시 보이게** 되어 다른 워커가 처리.
-→ 타임아웃이 너무 짧으면 정상 처리 중인데 **중복 실행**. 너무 길면 워커 죽었을 때 **복구 지연**. (SQS의 핵심 파라미터)
+**3) 한 부품 고장이 전체로 / One failure spreads**
+- KR: 주문 API가 알림 서비스를 직접 호출하면 알림이 죽을 때 주문도
+  실패. 큐로 분리하면 알림이 죽어도 메시지는 쌓였다가 나중에 처리.
+- EN: If the order API calls the notification service directly, orders
+  fail when notifications are down. A queue **decouples** them, so the
+  message waits and is processed after recovery.
 
-### (3) 재시도 + 지수 백오프(exponential backoff) + 지터(jitter)
-실패하면 바로 또 시도 → 죽은 다운스트림을 **DDoS** 한다(retry storm).
-`1s → 2s → 4s → 8s`로 늘리고(backoff), 거기에 **랜덤 지터**를 더해 모든 워커가 동시에 재시도하지 않게.
+**4) 실패한 작업이 증발 / Failed work disappears**
+- KR: 동기 호출은 에러 나면 그 작업이 사라진다. 큐는 ack 전엔 메시지를
+  안 지운다 → 재시도 가능.
+- EN: A sync call loses the work on error. A queue keeps the message
+  until it is acked, so it can be retried. (durability)
 
-### (4) Dead Letter Queue (DLQ)
-같은 메시지가 N번(예: 5번) 실패하면 → 메인 큐에서 빼서 **DLQ로 격리**.
-독성 메시지(poison pill) 하나가 큐 전체를 막는 걸 방지. DLQ는 사람이 보고 원인 분석.
-
-### (5) 순서 보장(ordering)
-기본 큐는 순서 보장 안 함(워커 여러 개가 병렬로 빼니까). 순서가 필요하면(예: 같은 계좌의 입출금):
-- **파티션/샤드별 순서**: 같은 키(account_id)는 같은 파티션 → 그 안에서만 순서 보장 (Kafka 방식)
-- 전역 순서를 원하면 사실상 **병렬성을 포기**해야 한다 (트레이드오프).
-
-### (6) 백프레셔(backpressure)
-프로듀서가 워커보다 빠르면 큐가 무한히 자란다 → 메모리 폭발 / 디스크 가득.
-**바운디드 큐**(크기 제한)로 막고, 가득 차면: ① 프로듀서를 블로킹(느리게) ② 거절(reject, 429) ③ 버림(drop). 무한 큐는 "장애를 뒤로 미루는 폭탄".
-
-### (7) 멱등성(idempotency)
-같은 메시지를 두 번 처리해도 결과가 같아야 한다 (at-least-once의 필연적 짝).
-구현: 메시지에 고유 ID → 처리 전 "이 ID 처리했나?" 체크(Redis SET / DB unique 제약 / upsert).
-
----
-
-## 4. 스케일업 vs 스케일아웃 — 트래픽 1000배 시나리오
-
-초당 100건 → 100,000건이 되면 이 설계는 어디서 깨지는가?
-
-### 스케일업 (수직 확장) — 한 대를 키운다
-- 워커 머신 CPU/메모리 ↑, 워커 스레드 수 ↑.
-- **한계**: 머신 1대의 물리 한계. CPU 코어, NIC 대역폭, 단일 장애점(SPOF). 비용이 선형이 아니라 **기하급수적**.
-- 빨리 쓰기엔 좋지만 천장이 낮다.
-
-### 스케일아웃 (수평 확장) — 똑같은 워커를 여러 대
-시스템 디자인의 정석. 큐가 빛나는 이유가 **여기**다.
-
-- **Competing Consumers 패턴**: 워커 인스턴스 N개가 *같은 큐*를 바라보고 경쟁적으로 메시지를 가져감. 큐가 자동으로 로드밸런서 역할.
-- **워커는 stateless** 여야 함 → 그래야 그냥 복제하면 됨. 상태는 DB/캐시로 밀어냄.
-- **오토스케일링**: 큐 깊이(backlog)를 메트릭으로 → 큐가 길어지면 워커 자동 증설, 짧아지면 축소. (실무 핵심 지표: queue depth, age of oldest message, consumer lag)
-- **큐 자체의 확장**: 단일 큐도 병목이 된다 → **파티셔닝/샤딩**. Kafka는 topic을 N개 partition으로 쪼개고, 각 partition을 다른 consumer가. 처리량 = 파티션 수 × 파티션당 처리량.
-
-### 깨지는 지점들 (실무에서 진짜 겪는 것)
-1. **큐는 비었는데 DB가 죽는다** — 워커를 늘리니 DB 커넥션 풀 고갈. → 워커 동시성에 상한, DB 커넥션 풀 사이징, 배치 처리.
-2. **단일 파티션 핫스팟** — 샤드 키가 한쪽으로 쏠림(예: 특정 인기 유저). → 키 설계 재고, 솔트(salt) 추가.
-3. **순서 vs 병렬의 충돌** — 순서 필요해서 파티션 1개 → 병렬 불가 → 처리량 한계. → 키별 파티셔닝으로 "필요한 범위만" 순서 보장.
-4. **리밸런싱 폭풍** — 컨슈머 추가/제거 시 파티션 재할당으로 잠깐 멈춤(Kafka). → 정적 멤버십, 점진적 리밸런싱.
-5. **재시도 폭풍이 다운스트림을 죽인다** — 백오프·지터·서킷브레이커 없으면 장애 증폭.
+> **한 줄 / One line:** 큐는 "시간"과 "고장"을 분리하는 장치다. /
+> A queue separates **time** and **failure**.
 
 ---
 
-## 5. 빅테크는 실제로 어떻게 쓰나
+## 3. 핵심 7개념 / The 7 core concepts
 
-| 회사/제품 | 무엇으로 | 왜 |
-| --- | --- | --- |
-| **AWS SQS** | 표준 매니지드 큐. at-least-once, visibility timeout, DLQ 내장 | 인프라 관리 0. "그냥 큐 필요해"의 기본 선택. FIFO 큐는 순서+중복제거 옵션 |
-| **AWS SNS+SQS fan-out** | SNS 토픽 1개 → SQS 여러 개 구독 | 한 이벤트를 여러 팀이 각자 큐로 소비 (pub/sub + 큐) |
-| **Kafka** (LinkedIn 출신, Uber·Netflix 전사) | 분산 **로그**. partition 단위 순서, 높은 처리량(초당 수백만), 재처리(offset 되감기) | 큐 + 이벤트 소싱 + 스트리밍. consumer group = competing consumers. → 모듈 09에서 딥다이브 |
-| **Celery (Python) — Instagram** | Redis/RabbitMQ 백엔드 + 워커 풀. 좋아요·피드 팬아웃·푸시 비동기 | 사용자 응답에서 무거운 작업 분리. 워커 수평 확장 |
-| **Sidekiq (Ruby) — GitHub, Shopify** | Redis 기반 백그라운드 잡. 이메일·웹훅·인덱싱 | 레일즈 표준. retry/DLQ(dead set) 내장 |
-| **Stripe** | 웹훅 전송을 큐로 + **at-least-once → 멱등 키**로 중복 방지 | 결제는 중복 처리가 치명적. "exactly-once는 멱등성으로 만든다"의 교과서 |
-| **Uber** | Kafka로 위치·매칭·결제 이벤트 파이프라인. Cadence/Temporal(워크플로 엔진)로 장기 작업 | 단순 큐로 부족한 "여러 단계·보상 트랜잭션" → 모듈 11 Saga와 연결 |
-| **YouTube/Instagram 업로드** | 업로드 즉시 200 응답, 트랜스코딩은 큐+워커 팜에서 비동기 | 무거운 미디어 처리를 응답 경로에서 제거 (문제 1의 교과서) |
+**(1) 전달 보장 / Delivery guarantee**
+- KR: `at-most-once`=처리 전 삭제(죽으면 유실, 로그용). `at-least-once`
+  =성공 후 삭제(중복 가능, **현실의 기본값**). `exactly-once`=전송만으론
+  사실상 불가 → at-least-once + 멱등성으로 "사실상 한 번".
+- EN: at-most-once = delete before processing (lost on crash; OK for
+  logs). at-least-once = delete after success (duplicates possible;
+  **the real default**). exactly-once = not really possible in transport
+  → at-least-once + idempotency gives "effectively once".
 
-> 선택 가이드(실무 직감):
-> - "그냥 비동기 작업 큐, 운영 부담 최소" → **SQS / Sidekiq / Celery**
-> - "높은 처리량 + 순서 + 재처리 + 여러 소비자" → **Kafka**
-> - "복잡한 다단계 워크플로 + 보상" → **Temporal/Cadence** (큐 위의 추상화)
+**(2) 가시성 타임아웃 / Visibility timeout**
+- KR: 워커가 메시지를 꺼내면 큐가 잠깐 숨긴다. 그 시간 안에 ack 못 하면
+  다시 보여 다른 워커가 처리. 너무 짧으면 정상 처리 중 중복, 너무 길면
+  복구 지연.
+- EN: When a worker takes a message, the queue hides it for a while. If
+  not acked in time, it reappears for another worker. Too short = a
+  still-running job is duplicated; too long = slow recovery.
+
+**(3) 백오프 + 지터 / Backoff + jitter**
+- KR: 즉시 재시도하면 죽은 다운스트림을 더 죽인다(retry storm). 간격을
+  1s→2s→4s로 늘리고 무작위 지터를 더해 동시 재시도를 흩뿌린다.
+- EN: Immediate retry hammers a struggling downstream (retry storm).
+  Grow the gap (1s→2s→4s) and add random jitter so retries do not all
+  fire at once.
+
+**(4) 데드레터 큐 / Dead letter queue (DLQ)**
+- KR: 같은 메시지가 N번 실패하면 메인 큐에서 빼서 격리. 독성 메시지
+  하나가 줄 전체를 막지 않게.
+- EN: After N failures, move the message aside. One poison message must
+  not block the whole queue.
+
+**(5) 순서 보장 / Ordering**
+- KR: 기본 큐는 순서 보장 없음(워커 병렬). 필요하면 같은 키를 같은
+  파티션에 보내 **그 안에서만** 순서 보장. 전역 순서는 병렬성 포기.
+- EN: A plain queue does not keep order (parallel workers). If needed,
+  route the same key to the same partition so order holds **within
+  that partition**. Global order means giving up parallelism.
+
+**(6) 백프레셔 / Backpressure**
+- KR: 프로듀서가 워커보다 빠르면 큐가 무한히 자란다. 바운디드 큐로 막고
+  가득 차면 ① 프로듀서 블로킹 ② 거절(429) ③ 버림. 무한 큐는 폭탄.
+- EN: If producers outrun workers, the queue grows forever. Use a
+  bounded queue; when full ① block the producer ② reject (429) ③ drop.
+  An unbounded queue is a bomb.
+
+**(7) 멱등성 / Idempotency**
+- KR: 같은 메시지를 두 번 처리해도 결과가 같아야 한다. 메시지 고유 ID로
+  처리 전 중복 확인(Redis SETNX / DB unique / upsert).
+- EN: Processing the same message twice must give the same result. Use
+  a unique message id to detect duplicates before doing the work
+  (Redis SETNX / DB unique key / upsert).
 
 ---
 
-## 6. 트레이드오프 정리 (면접에서 이걸 말해야 점수)
+## 4. 스케일업 vs 스케일아웃 / Scale-up vs scale-out
 
-| 얻는 것 | 잃는 것 / 대가 |
+**KR.** 스케일업 = 한 대를 키운다(CPU·스레드↑). 빠르지만 천장이 낮고
+단일 장애점. 스케일아웃 = 똑같은 워커를 여러 대. 큐가 빛나는 지점.
+워커들이 같은 큐를 경쟁적으로 소비(competing consumers). 워커는
+무상태여야 복제 가능. 큐에 쌓인 양(backlog)을 보고 자동 증감
+(autoscaling). 큐 자체도 병목이면 파티션으로 쪼갠다.
+
+**EN.** Scale-up = make one machine bigger (more CPU/threads). Fast but
+low ceiling and a single point of failure. Scale-out = run many
+identical workers — where a queue shines. Workers compete on the same
+queue (competing consumers). Workers must be stateless to be cloned.
+Autoscale on backlog. If the queue itself is the bottleneck, split it
+into partitions.
+
+**깨지는 지점 / Where it breaks**
+- KR: ① 큐는 비는데 DB가 죽음(워커 늘리니 DB 커넥션 고갈) ② 핫 파티션
+  (키 쏠림) ③ 순서 vs 병렬 충돌 ④ 리밸런싱 멈춤 ⑤ 재시도 폭풍.
+- EN: ① queue empties but DB dies (more workers exhaust DB connections)
+  ② hot partition (skewed key) ③ ordering vs parallelism conflict
+  ④ rebalancing pause ⑤ retry storm.
+
+---
+
+## 5. 빅테크 사례 / Big tech in practice
+
+- **SQS** — KR: 매니지드 큐, at-least-once, 가시성·DLQ 내장. "그냥 큐
+  필요해"의 기본. EN: managed queue, at-least-once, visibility/DLQ
+  built in. The default "I just need a queue".
+- **Kafka** — KR: 분산 로그, 파티션 순서, 높은 처리량, offset 되감기로
+  재처리. EN: distributed log, per-partition order, high throughput,
+  replay by rewinding the offset.
+- **Celery / Sidekiq** — KR: 백그라운드 잡 워커(Instagram, GitHub).
+  무거운 일을 응답 경로에서 제거. EN: background job workers; move
+  heavy work out of the request path.
+- **Stripe** — KR: at-least-once + 멱등 키로 결제 중복 방지. EN:
+  at-least-once + an idempotency key so a payment is never double-charged.
+
+---
+
+## 6. 트레이드오프 / Trade-offs
+
+| 얻는 것 / Gain | 잃는 것 / Cost |
 | --- | --- |
-| 빠른 응답(비동기) | **결과가 즉시 없음** → 결과 조회/콜백/폴링 설계 필요, 디버깅 어려움 |
-| 장애 격리(디커플링) | **운영 복잡도 ↑** — 큐 자체가 새 인프라·새 장애점, 모니터링 필요 |
-| 부하 평탄화 | **지연(latency) 증가** — 큐에서 대기, 백로그 길면 더 느림 |
-| 수평 확장 용이 | **순서 보장 어려움**, exactly-once 아님 → 멱등성 직접 구현 |
-| 내구성(메시지 보관) | **중복 가능성** 항상 존재 (at-least-once) |
+| 빠른 응답 / fast response | 결과가 즉시 없음 / no immediate result |
+| 장애 격리 / failure isolation | 운영 복잡도↑ / more ops complexity |
+| 부하 평탄화 / load leveling | 지연 증가 / added latency |
+| 수평 확장 / easy scale-out | 순서·정확히한번 어려움 / hard ordering & exactly-once |
+| 내구성 / durability | 중복 가능 / duplicates possible |
 
-> "큐는 만능 아님" — 강한 일관성·즉시 결과·단순함이 필요하면 동기 호출이 더 낫다. **큐는 비동기로 해도 되는 작업에만.**
-
----
-
-## 7. 면접 체크리스트 (이 모듈 끝나면 다 답할 수 있어야)
-
-- [ ] 큐를 식당 비유로 90초 설명 (파인만)
-- [ ] 큐를 안 쓰면 터지는 4가지 (느림 / 스파이크 죽음 / 강결합 / 유실)
-- [ ] at-least-once가 기본인 이유 + exactly-once를 멱등성으로 만드는 법
-- [ ] visibility timeout이 너무 짧을 때 / 길 때 각각 무슨 일
-- [ ] 백오프에 지터를 왜 넣나 (retry storm)
-- [ ] DLQ는 왜 필요한가 (poison pill)
-- [ ] competing consumers로 어떻게 수평 확장하나, 한계는 (DB 커넥션, 핫 파티션)
-- [ ] 순서 보장과 병렬성의 트레이드오프
-- [ ] 바운디드 큐 / 백프레셔가 없으면 무슨 폭탄
-- [ ] SQS vs Kafka 언제 무엇을
+> KR: 강한 일관성·즉시 결과·단순함이 필요하면 동기 호출이 낫다. 큐는
+> 비동기로 해도 되는 일에만. / EN: If you need strong consistency, an
+> immediate result, or simplicity, a synchronous call is better. Use a
+> queue only for work that can be asynchronous.
 
 ---
 
-## 8. 다음 단계
+## 7. 면접 체크리스트 / Interview checklist
 
-→ `reference/` 의 Java 코드 3개를 **순서대로** 분석:
-1. `R1_NaiveQueueWorker.java` — 가장 단순한 큐+워커 (문제점을 직접 보기 위함)
-2. `R2_RetryDlqQueue.java` — 재시도 + 백오프 + DLQ + 멱등성
-3. `R3_BackpressureGracefulShutdown.java` — 바운디드 큐 + 백프레셔 + graceful shutdown + 메트릭
+- [ ] 식당 비유 90초 / restaurant analogy in 90s
+- [ ] 안 쓰면 터지는 4가지 / the four failures without a queue
+- [ ] at-least-once + 멱등성으로 exactly-once / exactly-once via idempotency
+- [ ] 가시성 타임아웃 짧을 때/길 때 / visibility timeout too short/long
+- [ ] 지터를 왜 / why jitter (retry storm)
+- [ ] DLQ는 왜 / why DLQ (poison pill)
+- [ ] competing consumers 한계 / its limit (DB, hot partition)
+- [ ] 순서 vs 병렬 / ordering vs parallelism
+- [ ] 무한 큐 폭탄 / the unbounded-queue bomb
+- [ ] SQS vs Kafka 언제 / when each
 
-→ 그 다음 `blank/` 에서 직접 구현, `solution/`과 비교.
-→ 마지막으로 `QUIZ.md`의 **확인 퀴즈 10문제**.
+---
+
+## 8. 다음 / Next
+
+- 진화 트랙: `evolution/EVOLUTION.md` (S0→S5 실행) /
+  Evolution track: `evolution/EVOLUTION.md` (run S0→S5)
+- 영어 말하기 스크립트: `EXPLAIN_EN.md` /
+  Spoken English scripts: `EXPLAIN_EN.md`
+- **실무 표준 솔루션 + 코드**: `production/STANDARD_SOLUTION.md` /
+  **Real-world standard solutions + code**: `production/STANDARD_SOLUTION.md`
+- 직접 구현: `blank/` → `solution/` / Build it: `blank/` → `solution/`
