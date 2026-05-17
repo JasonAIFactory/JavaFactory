@@ -1,7 +1,7 @@
 // =============================================================================
-// 정답 — Queue & Worker 종합
-// 실행: java -ea Q1_QueueWorker_Solution.java
-// blank/Q1_QueueWorker.java 와 한 줄씩 비교하며 "왜 이렇게 했는지" 확인할 것.
+// SOLUTION - Queue & Worker (all-in-one)
+// Run: java -ea Q1_QueueWorker_Solution.java
+// Compare line by line with blank/Q1_QueueWorker.java and ask "why this way?".
 // =============================================================================
 
 import java.util.concurrent.*;
@@ -11,7 +11,7 @@ import java.util.*;
 public class Q1_QueueWorker_Solution {
 
     record Task(int id, int attempts) {
-        Task retryOnce() { return new Task(id, attempts + 1); }   // 새 불변 객체로 attempts+1
+        Task retryOnce() { return new Task(id, attempts + 1); }   // new immutable object with attempts+1
     }
 
     static final int MAX_ATTEMPTS = 4;
@@ -19,20 +19,21 @@ public class Q1_QueueWorker_Solution {
 
     static final AtomicInteger success = new AtomicInteger();
     static final AtomicInteger dlqCount = new AtomicInteger();
-    // 교훈: 드레인 완료를 "큐가 비었나"로만 판단하면, 백오프 대기 중인
-    //       지연 재시도가 아직 스케줄러에 떠 있을 때 워커가 먼저 종료해 유실된다.
-    //       => 종료 조건은 "큐 비었다"가 아니라 "미완료 작업 수(pending)==0".
+    // Lesson (Trap A): if "drain done" is judged only by "is the queue empty",
+    //   a retry waiting on backoff (still in the scheduler, not in the queue)
+    //   is lost when the worker exits first.
+    //   => Exit condition is "pending == 0", not "queue empty".
     static final AtomicInteger pending = new AtomicInteger();
-    // 교훈: 재시도 재투입을 offer()로 하면 큐가 꽉 찼을 때 조용히 사라진다
-    //       (pending이 안 줄어 영원히 드레인 안 됨). 블로킹 put()으로 넣고,
-    //       단일 스레드 스케줄러가 put에서 막혀 다른 재시도를 못 돌리지 않게 풀로 둔다.
+    // Lesson (Trap B): requeue with offer() drops the retry when the bounded
+    //   queue is full (pending never drops -> never drains). Use a blocking
+    //   put(). Use a pool so one put() blocking does not freeze other retries.
     static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public static void main(String[] args) throws Exception {
 
-        BlockingQueue<Task> queue = new ArrayBlockingQueue<>(8);          // 바운디드 = 백프레셔
+        BlockingQueue<Task> queue = new ArrayBlockingQueue<>(8);          // bounded = backpressure
         BlockingQueue<Task> dlq = new LinkedBlockingQueue<>();
-        Set<Integer> processedIds = ConcurrentHashMap.newKeySet();        // 멱등성 가드
+        Set<Integer> processedIds = ConcurrentHashMap.newKeySet();        // idempotency guard
 
         AtomicBoolean accepting = new AtomicBoolean(true);
         int workerCount = 3;
@@ -46,25 +47,25 @@ public class Q1_QueueWorker_Solution {
                     while (true) {
                         Task task = queue.poll(150, TimeUnit.MILLISECONDS);
                         if (task == null) {
-                            if (!accepting.get() && pending.get() == 0) break; // 미완료 0 → 진짜 드레인 완료
-                            continue;                                          // 지연 재시도가 아직 떠 있을 수 있음
+                            if (!accepting.get() && pending.get() == 0) break; // pending 0 -> truly drained
+                            continue;                                          // a delayed retry may still be out there
                         }
-                        if (processedIds.contains(task.id())) continue;        // 중복 → skip(ack), pending 미변동
+                        if (processedIds.contains(task.id())) continue;        // duplicate -> skip (ack), pending unchanged
                         try {
                             process(id, task);
-                            processedIds.add(task.id());                       // 성공 "후" 기록 = at-least-once
+                            processedIds.add(task.id());                       // record AFTER success = at-least-once
                             success.incrementAndGet();
-                            pending.decrementAndGet();                         // 터미널 상태 도달
+                            pending.decrementAndGet();                         // reached a terminal state
                         } catch (Exception e) {
                             if (task.attempts() + 1 >= MAX_ATTEMPTS) {
-                                dlq.offer(task);                               // 한도 초과 → 격리
+                                dlq.offer(task);                               // over the limit -> isolate
                                 dlqCount.incrementAndGet();
-                                pending.decrementAndGet();                     // 터미널 상태 도달
+                                pending.decrementAndGet();                     // reached a terminal state
                             } else {
                                 long delay = backoffWithJitter(task.attempts());
                                 Task retried = task.retryOnce();
-                                scheduler.schedule(() -> {                       // 재시도는 아직 미완료 → pending 유지
-                                    try { queue.put(retried); }                 // put = 유실 없음(꽉 차면 대기)
+                                scheduler.schedule(() -> {                       // retry not done yet -> keep pending
+                                    try { queue.put(retried); }                 // put = no loss (waits if full)
                                     catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                                 }, delay, TimeUnit.MILLISECONDS);
                             }
@@ -79,24 +80,24 @@ public class Q1_QueueWorker_Solution {
         }
 
         for (int i = 1; i <= 15; i++) {
-            pending.incrementAndGet();                                          // 고유 작업 1건 = 미완료 +1
-            queue.put(new Task(i, 0));                                          // put = 가득 차면 블로킹(백프레셔)
+            pending.incrementAndGet();                                          // one unique task = pending +1
+            queue.put(new Task(i, 0));                                          // put = blocks if full (backpressure)
         }
-        queue.put(new Task(1, 0));                                              // 중복 → 멱등성 가드가 막음(pending 미변동)
+        queue.put(new Task(1, 0));                                              // duplicate -> idempotency guard blocks it (pending unchanged)
 
-        accepting.set(false);                                                   // 1) 새 작업 중단
-        done.await(15, TimeUnit.SECONDS);                                       // 2) 드레인 대기
-        pool.shutdown();                                                        // 3) 정상 종료(shutdownNow 아님)
+        accepting.set(false);                                                   // 1) stop new work
+        done.await(15, TimeUnit.SECONDS);                                       // 2) wait for drain
+        pool.shutdown();                                                        // 3) clean exit (NOT shutdownNow)
         scheduler.shutdownNow();
 
         int uniqueTasks = 15;
         int expectedDlq = 15 / 4;                 // 4,8,12
         int expectedSuccess = uniqueTasks - expectedDlq;
         System.out.println("success=" + success.get() + " dlq=" + dlqCount.get());
-        assert success.get() == expectedSuccess : "성공 수 불일치: " + success.get();
-        assert dlqCount.get() == expectedDlq : "DLQ 수 불일치: " + dlqCount.get();
-        assert success.get() + dlqCount.get() == uniqueTasks : "유실 발생!";
-        System.out.println("✅ ALL ASSERTIONS PASSED — 유실 0, 멱등성/재시도/DLQ 정상");
+        assert success.get() == expectedSuccess : "wrong success count: " + success.get();
+        assert dlqCount.get() == expectedDlq : "wrong DLQ count: " + dlqCount.get();
+        assert success.get() + dlqCount.get() == uniqueTasks : "task loss!";
+        System.out.println("ALL ASSERTIONS PASSED - zero loss, idempotency/retry/DLQ OK");
     }
 
     static void process(int workerId, Task task) {
