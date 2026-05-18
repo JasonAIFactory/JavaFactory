@@ -55,7 +55,7 @@
 | # | 모듈 | 한 줄 요약 | 핵심 빅테크 |
 | --- | --- | --- | --- |
 | **01** | **Queue & Worker** ✅ | 비동기·디커플링·부하 평탄화의 시작점 | SQS, Celery, Sidekiq |
-| 02 | Caching | 같은 일을 두 번 하지 않기. 무효화가 진짜 어려움 | Redis, Memcached, CDN edge |
+| **02** | **Caching** ✅ | 같은 일을 두 번 하지 않기. 무효화가 진짜 어려움 | Redis, Memcached, CDN edge |
 | 03 | Load Balancing | 트래픽을 여러 서버로. L4 vs L7, health check | Nginx, Envoy, AWS ALB |
 | 04 | Rate Limiting | 남용·폭주 막기. token bucket vs sliding window | Stripe, Cloudflare |
 | 05 | Consistent Hashing | 노드가 늘고 줄어도 키가 안 흩어지게 | Cassandra, DynamoDB ring |
