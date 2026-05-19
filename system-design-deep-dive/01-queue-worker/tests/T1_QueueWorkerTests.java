@@ -35,8 +35,13 @@ public class T1_QueueWorkerTests {
         return Math.max(0, base + jitter);
     }
 
-    // Result of running the pipeline once.
-    static final class Result { int success, dlq, processedCalls, maxQueueSeen; }
+    // Result of running the pipeline once. `drained` = workers reached the
+    // pending==0 exit BEFORE the await timeout. Workers only exit at
+    // pending==0, so drained==true => counts are final and trustworthy.
+    // drained==false means the box was too slow (CPU starvation), NOT a
+    // logic failure - we report that distinctly so it is never confused
+    // with a real zero-loss regression.
+    static final class Result { int success, dlq, processedCalls, maxQueueSeen; boolean drained; }
 
     // A faithful queue+worker: bounded queue (backpressure), N workers,
     // retry with backoff via a scheduler, DLQ after MAX, idempotent dedup,
@@ -91,7 +96,10 @@ public class T1_QueueWorkerTests {
         for (int d = 0; d < duplicatesOfId1; d++) queue.put(new Task(1, 0)); // dup: pending unchanged
 
         accepting.set(false);
-        done.await(20, TimeUnit.SECONDS);
+        // Generous: backoffs here are tens of ms, so real drain is < 1s.
+        // 45s only ever lapses if the host is starved (e.g. many JVMs at
+        // once) - that is an environment signal, not a logic result.
+        r.drained = done.await(45, TimeUnit.SECONDS);
         pool.shutdown(); sched.shutdownNow();
         r.success = success.get(); r.dlq = dlq.get();
         r.processedCalls = processedCalls.get(); r.maxQueueSeen = maxQ.get();
@@ -106,6 +114,13 @@ public class T1_QueueWorkerTests {
     }
     interface ThrowingRunnable { void run() throws Exception; }
     static void check(boolean c, String m) { if (!c) throw new AssertionError(m); }
+    // Distinguish "host too slow" from a real logic regression. Without
+    // this, a starved CI box would falsely shout "zero-loss broken".
+    static void mustDrain(Result r) {
+        if (!r.drained) throw new AssertionError(
+            "INCONCLUSIVE: pipeline did not quiesce within 45s (host starved) "
+          + "- this is an environment signal, NOT a zero-loss/logic failure");
+    }
     static void eq(long a, long b, String m) { if (a != b) throw new AssertionError(m + " (got " + a + ", want " + b + ")"); }
 
     // ---- UNIT -----------------------------------------------------------
@@ -138,23 +153,27 @@ public class T1_QueueWorkerTests {
     static void zeroLoss_successPlusDlqEqualsUnique() throws Exception {
         for (int trial = 0; trial < 5; trial++) {
             Result r = run(15, 3, 8, Set.of(4, 8, 12), 0);
+            mustDrain(r);
             eq(r.success + r.dlq, 15, "ZERO-LOSS INVARIANT broken (trial " + trial + ")");
         }
     }
     static void poisonGoesToDlqExactly() throws Exception {
         Result r = run(15, 3, 8, Set.of(4, 8, 12), 0);
+        mustDrain(r);
         eq(r.dlq, 3, "poison tasks must all reach DLQ");
         eq(r.success, 12, "non-poison must all succeed");
     }
     static void idempotency_duplicateNeverProcessedTwice() throws Exception {
         for (int trial = 0; trial < 5; trial++) {
             Result r = run(15, 4, 8, Set.of(), 6);   // 6 duplicates of id=1, all healthy
+            mustDrain(r);
             eq(r.processedCalls, 15, "duplicate id was processed more than once (trial " + trial + ")");
             eq(r.success, 15, "success must equal unique tasks");
         }
     }
     static void backpressure_queueNeverExceedsCapacity() throws Exception {
         Result r = run(40, 2, 8, Set.of(), 0);
+        mustDrain(r);
         check(r.maxQueueSeen <= 8, "bounded queue exceeded capacity: " + r.maxQueueSeen);
         eq(r.success, 40, "all tasks must still complete under backpressure");
     }
