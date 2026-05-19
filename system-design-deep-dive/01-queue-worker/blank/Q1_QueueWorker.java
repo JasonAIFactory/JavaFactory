@@ -65,7 +65,7 @@ public class Q1_QueueWorker {
                     while (true) {
                         // TODO 6: poll(timeout). If null and !accepting and no work left -> break.
                         //         If work may still arrive -> continue. (See Trap A.)
-                        Task task = null; // <- replace
+                        Task task = todo6_pollWithDrain(queue, accepting); // <- replace this call
 
                         // TODO 5: if this id was already processed -> skip (continue).
 
@@ -110,6 +110,15 @@ public class Q1_QueueWorker {
     static void process(int workerId, Task task) {
         if (task.id() % 4 == 0) throw new RuntimeException("poison " + task.id());
         sleep(60);
+    }
+
+    // Skeleton stub so the file COMPILES (it declares InterruptedException so
+    // the worker's catch is reachable). It fails fast until you implement it.
+    // Replace this whole method body with the real poll(timeout) + drain
+    // decision (Trap A): return a task, or null when there is no more work.
+    static Task todo6_pollWithDrain(BlockingQueue<Task> queue, AtomicBoolean accepting)
+            throws InterruptedException {
+        throw new UnsupportedOperationException("TODO 6: implement poll(timeout) + drain/break");
     }
 
     static long backoffWithJitter(int attempt) {
