@@ -31,6 +31,12 @@ public final class Wallet {
     private final WalletId id;
     private Money balance;
     private long version;
+    // The version at which this wallet was last loaded or saved. Domain
+    // operations do NOT touch this - only the repository, on a successful
+    // save. The repository's OCC compares stored.version to this field to
+    // detect concurrent writers. This split (revision vs persisted) is how
+    // JPA's @Version and SQLAlchemy's version_id_col actually work.
+    private long persistedVersion;
 
     private Wallet(WalletId id, Money openingBalance, long version) {
         this.id = Objects.requireNonNull(id, "id");
@@ -39,6 +45,7 @@ public final class Wallet {
             throw new IllegalArgumentException("Opening balance must not be negative");
         }
         this.version = version;
+        this.persistedVersion = version;
     }
 
     /** Factory for a brand-new wallet (version starts at 0). */
@@ -68,9 +75,19 @@ public final class Wallet {
     }
 
     // ---- accessors (read-only views) ---------------------------------------
-    public WalletId id()       { return id; }
-    public Money    balance()  { return balance; }
-    public long     version()  { return version; }
+    public WalletId id()               { return id; }
+    public Money    balance()          { return balance; }
+    public long     version()          { return version; }
+    public long     persistedVersion() { return persistedVersion; }
+
+    /**
+     * Repository-only API: called after a successful conditional save so the
+     * next save uses the new version as its "expected prior". DO NOT call
+     * from application or domain code - that would defeat OCC.
+     */
+    public void markPersisted() {
+        this.persistedVersion = this.version;
+    }
 
     private void requireSameCurrency(Money amount) {
         if (amount.currency() != balance.currency()) {

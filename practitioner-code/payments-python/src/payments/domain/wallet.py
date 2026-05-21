@@ -26,7 +26,7 @@ from payments.domain.wallet_id import WalletId
 
 
 class Wallet:
-    __slots__ = ("_id", "_balance", "_version")
+    __slots__ = ("_id", "_balance", "_version", "_persisted_version")
 
     def __init__(self, wallet_id: WalletId, opening_balance: Money, version: int = 0) -> None:
         if opening_balance is None or wallet_id is None:
@@ -36,6 +36,12 @@ class Wallet:
         self._id = wallet_id
         self._balance = opening_balance
         self._version = version
+        # The version at which this wallet was last loaded or saved. Domain
+        # operations do NOT touch this - only the repository, on a successful
+        # save. The repo's OCC compares the stored row's version to this
+        # field. This split (revision vs persisted) mirrors SQLAlchemy's
+        # version_id_col and JPA's @Version.
+        self._persisted_version = version
 
     # ---- factories ---------------------------------------------------------
     @classmethod
@@ -73,6 +79,15 @@ class Wallet:
     @property
     def version(self) -> int:
         return self._version
+
+    @property
+    def persisted_version(self) -> int:
+        return self._persisted_version
+
+    def mark_persisted(self) -> None:
+        """Repository-only API: called after a successful conditional save.
+        Do NOT call from application or domain code - it would defeat OCC."""
+        self._persisted_version = self._version
 
     def _require_same_currency(self, amount: Money) -> None:
         if amount.currency is not self._balance.currency:
