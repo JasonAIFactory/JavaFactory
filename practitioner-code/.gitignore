@@ -1,0 +1,5 @@
+payments-java/target/
+payments-python/.venv/
+payments-python/**/__pycache__/
+payments-python/.pytest_cache/
+payments-python/*.egg-info/
